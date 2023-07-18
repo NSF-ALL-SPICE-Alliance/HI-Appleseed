@@ -1,0 +1,47 @@
+---
+title: "PRPSL_Results"
+author: "Connor Flynn"
+date: "7/12/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+options(scipen = 99)
+```
+
+
+
+
+Create a data frame with the income data
+
+```{r}
+income_data <- data.frame(
+  Income = c("Bottom 20%", "Second 20%", "Third 20%", "Fourth 20%", "Next 15%", "Next 4%", "Top 1%"),
+  Income_Range_Start = c(0, 25000, 52000, 84000, 135000, 270000, 626000),
+  Income_Range_End = c(25000, 52000, 84000, 135000, 270000, 626000, 2000000),
+  Average_Income = c(13000, 38000, 67000, 111000, 183000, 376000, 1403000)
+)
+```
+
+
+Calculate the average for each income category
+
+```{r}
+income_data <- transform(income_data, Average_Income = ifelse(Income == "Top 1%", Average_Income, (Income_Range_Start + Income_Range_End) / 2))
+```
+
+
+
+Create the box plot with average
+
+```{r}
+ggplot(income_data, aes(x = Income, y = Average_Income)) +
+  geom_boxplot() +
+  labs(x = "Income Range", y = "Average Income") +
+  ggtitle("Income Distribution") +
+  theme_minimal()
+
+```
+
