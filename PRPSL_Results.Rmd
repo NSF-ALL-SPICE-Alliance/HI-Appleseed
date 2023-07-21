@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
+library(tidyverse)
 options(scipen = 99)
 ```
 
@@ -16,32 +17,57 @@ options(scipen = 99)
 
 Create a data frame with the income data
 
+Income Ranges and Averages for all residents
+
+Variables after Population - CTC for Children Under 18
+
 ```{r}
 income_data <- data.frame(
-  Income = c("Bottom 20%", "Second 20%", "Third 20%", "Fourth 20%", "Next 15%", "Next 4%", "Top 1%"),
+  Income_Group = c("Bottom 20%", "Second 20%", "Third 20%", "Fourth 20%", "Next 15%", "Next 4%", "Top 1%"),
   Income_Range_Start = c(0, 25000, 52000, 84000, 135000, 270000, 626000),
-  Income_Range_End = c(25000, 52000, 84000, 135000, 270000, 626000, 2000000),
-  Average_Income = c(13000, 38000, 67000, 111000, 183000, 376000, 1403000)
+  Income_Range_End = c(25000, 52000, 84000, 135000, 270000, 626000, 1500000),
+  Average_Income = c(13000, 38000, 67000, 111000, 183000, 376000, 1403000),
+  Population = c(289430, 289430, 289430, 289430, 217073, 57886, 14471),
+  Tax_Change_as_Percent_of_Income_U18 = c(-1.19, -0.51, -0.20, -0.06, 0.00, 0.00, 0.00),
+  Average_Tax_Change_U18 = c(-152, -194, -136, -66, -7, -2, -2),
+  Percent_with_Income_Tax_Cut_U18 = c(15.5, 16.2, 20.5, 19.3, 1.7, 0.7, 1.8),
+  Avg_Tax_Cut_for_those_With_Cut_U18 = c(-979, -1200, -662, -340, -399, -252, -130),
+  Share_of_Resident_Tax_Cut_U18 = c(26.8, 34.5, 24.1, 11.6, 0.9, 0.1, 0.0)
 )
 ```
 
 
-Calculate the average for each income category
-
 ```{r}
-income_data <- transform(income_data, Average_Income = ifelse(Income == "Top 1%", Average_Income, (Income_Range_Start + Income_Range_End) / 2))
+# Convert "Income" to a factor with the desired order
+income_data$Income_Group <- factor(income_data$Income_Group, levels = c("Bottom 20%", "Second 20%", "Third 20%", "Fourth 20%", "Next 15%", "Next 4%", "Top 1%"))
 ```
 
 
 
-Create the box plot with average
 
 ```{r}
-ggplot(income_data, aes(x = Income, y = Average_Income)) +
-  geom_boxplot() +
-  labs(x = "Income Range", y = "Average Income") +
-  ggtitle("Income Distribution") +
-  theme_minimal()
 
+# Create the visualization using ggplot
+ggplot(income_data, aes(x = Income_Group, y = Income_Range_End)) +
+  geom_boxplot(aes(ymin = Income_Range_Start, lower = Income_Range_Start, 
+                   middle = Average_Income, upper = Income_Range_End, ymax = Income_Range_End),
+               stat = "identity", width = 0.6, position = position_dodge(width = 0.8),
+               color = "black", fill = "steelblue") +
+  labs(x = "Income Group", y = "Income (Box = Income Range, Line = Income Average)",
+       title = "2023 Income Ranges, All Hawaii Residents") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma) +
+  geom_text(aes(label = scales::comma_format()(Population), y = Income_Range_End + 80000), 
+            color = "black", size = 3, nudge_y = 100) + 
+  geom_text(aes(label = "residents", y = Income_Range_End + 30000),
+            color = "black", size = 3) 
+```
+
+
+```{r}
+ggplot(income_data, aes(y = Share_of_Resident_Tax_Cut_U18, color = Income_Group, x = Percent_with_Income_Tax_Cut_U18, size = Avg_Tax_Cut_for_those_With_Cut_U18)) +
+  geom_point() +
+  theme_bw() +
+  scale_size_continuous(trans = "reverse")
 ```
 
