@@ -67,7 +67,12 @@ ggplot(income_data, aes(x = Income_Group, y = Income_Range_End)) +
 ```{r}
 ggplot(income_data, aes(y = Share_of_Resident_Tax_Cut_U18, color = Income_Group, x = Percent_with_Income_Tax_Cut_U18, size = Avg_Tax_Cut_for_those_With_Cut_U18)) +
   geom_point() +
-  theme_bw() +
-  scale_size_continuous(trans = "reverse")
+  theme_minimal() +
+  scale_size_continuous(trans = "reverse") +
+  labs(x = "Percent of Income Group with Tax Cut (%)",
+       y = "Share of Resident Tax Cut",
+       title = "Hawaii U18 Tax Cut",
+       color = "Income Group",
+       size = "Average Tax Cut for Recievers ($)")
 ```
 
