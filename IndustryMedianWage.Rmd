@@ -1,0 +1,52 @@
+---
+title: "Tidycensus2"
+output: html_document
+date: "2023-08-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidycensus)
+library(plotly)
+library(ggplot2)
+
+```
+```{r}
+acs2021 <- load_variables(2021, "acs5", cache = TRUE)
+```
+```{r}
+hi_earnings_ind <- get_acs(
+  geography = "state",
+  state = "Hawaii",
+  variables = c("All Industries" = "B24031_001",
+                "Accomodations and Food" = "B24031_025",
+                "Health and Human Services" = "B24031_022",
+                "Education" = "B24031_021"
+                ),
+  year = 2021
+)
+```
+
+
+```{r}
+library(scales)
+bar_chart1 <- ggplot(hi_earnings_ind, aes(x = variable, y = estimate)) + 
+  geom_bar(stat = "identity", fill = "#3499db") + 
+  geom_text(aes(label = scales::dollar(estimate, digits = 1)), vjust = -0.9, family = "Times New Roman", size = 4, color = "black", position = position_stack(vjust = 1.05)) +
+  labs(x = "Industry", y = "Median Income") +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1e-3, suffix = "k")) +
+  theme_classic()
+ggplotly()
+
+```
+Placing the data into a bar chart
+```{r}
+bar_chart2 <- plot_ly(hi_earnings_ind, x = ~variable, y = ~estimate, type = "bar", text = ~paste("$", format(estimate, big.mark = ","), sep = ""), marker = list(color = '#3499db', line = list(color = '#2a3f5f', width = 2))) %>%
+  layout(title = "",
+         xaxis = list(title = "Industry"),
+         yaxis = list(title = "Median Income", tickformat = "$.1s"))
+
+bar_chart
+```
+

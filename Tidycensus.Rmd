@@ -1,0 +1,62 @@
+---
+title: "Tidycensus_test"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-08-24"
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidycensus)
+library(plotly)
+
+```
+
+```{r}
+acs2021 <- load_variables(2021, "acs5", cache = TRUE)
+```
+
+Median income for HI
+```{r}
+hi_inc_age_wide <- get_acs(
+  geography = "tract",
+  state = "Hawaii",
+  variables = c(medinc = "B19013_001",
+                medage = "B01002_001"),
+  output = "wide",
+  year = 2020
+)
+```
+
+
+```{r}
+ggplot(hi_inc_age_wide, aes(x = medincE, y = medageE)) +
+  geom_point() +
+  theme_minimal()
+```
+
+
+```{r}
+hi_inc_age_wide <- hi_inc_age_wide %>%
+  mutate(county = sub(".*?,\\s*(.*County, .*Hawaii)$", "\\1", NAME))
+```
+
+
+```{r}
+income_age_plot <- ggplot(hi_inc_age_wide, aes(x = medincE, y = medageE, color = county, label = NAME)) +
+  geom_point() +
+  theme_minimal()
+ggplotly(income_age_plot)
+```
+
+
+```{r}
+box_plot <- ggplot(hi_inc_age_wide, aes(x = medincE, y = county)) +
+  geom_boxplot() +
+  theme_minimal()
+ggplotly(box_plot)
+```
+

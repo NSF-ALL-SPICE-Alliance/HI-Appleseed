@@ -1,0 +1,24 @@
+---
+title: "Median Industry Wage by Race"
+output: html_document
+date: "2023-09-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidycensus)
+library(tidyverse)
+library(ggplot2)
+
+medwage_race_industry <- getpums(
+  variables = c()
+  geography = "state",
+  state = "Hawaii",
+  dataset = "acs5",
+  year = 2021
+)
+```
+
+
