@@ -1,0 +1,77 @@
+---
+title: "Regression Analysis Poverty"
+output: html_document
+date: "2023-09-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+```{r}
+
+```
+
+Getting the variables set up
+```{r}
+library(tidycensus)
+library(sf)
+variables_poverty <- c(
+  poverty_denom = "B17001_002",
+  pct_healthinsurance = "DP03_0096P",
+  total_population = "DP05_0001",
+  pct_college = "DP02_0068P",
+  pct_white = "DP05_0077P",
+  owner_occupied = "DP04_0046P"
+)
+```
+
+Retrieving the ACS data
+```{r}
+library(dplyr)
+poverty_regression <- get_acs(
+  geography = "tract",
+  variables = variables_poverty,
+  state = "HI",
+  output = "wide",
+  year = 2021
+) 
+```
+```{r}
+library(dplyr)
+library(tidycensus)
+poverty_regression <- poverty_regression %>% mutate(pct_poverty = 100 * (poverty_denomE / total_populationE))
+```
+
+
+```{r}
+library(stringr)
+library(sf)
+library(dplyr)
+poverty_regression <- poverty_regression %>%
+  rename_with(~str_remove(., "E$"), .cols = everything()) %>%
+  na.omit()
+```
+
+Running a regression
+```{r}
+formula <- "pct_poverty ~ pct_college + pct_white + owner_occupied + total_population + pct_healthinsurance"
+model1 <- lm(formula = formula, data = poverty_regression)
+summary(model1)
+```
+Inspect colinearity
+```{r}
+library(car)
+vif(model1)
+```
+```{r}
+
+```
+
+
+
+
+
+
+
+
