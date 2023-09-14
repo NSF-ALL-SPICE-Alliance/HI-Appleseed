@@ -1,0 +1,59 @@
+---
+title: "Median Industry Wage by Race"
+output: html_document
+date: "2023-09-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidycensus)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(scales)
+```
+```{r}
+
+
+pums_data <- get_pums(
+  variables = c("RAC3P", "WAGP"),
+  year = 2021,
+  survey = "acs5",
+  state = "HI"  
+)
+
+```
+```{r}
+# Filter the data to only include rows with selected races
+filtered_data <- pums_data %>% 
+  filter(
+    RAC3P %in% c("001", "005", "006", "007", "011", "014")) %>% 
+      count(RAC3P, WAGP, wt = PWGTP) %>% 
+      group_by(RAC3P) %>%
+  mutate(
+    RAC3P = recode(
+      RAC3P,
+      "001" = "White alone",
+      "005" = "Chinese alone",
+      "006" = "Filipino alone",
+      "007" = "Japanese alone",
+      "011" = "Native Hawaiian alone",
+      "014" = "Other Pacific Islander alone"
+    )
+  )
+median_wage_by_race <- filtered_data %>% summarize(median_wage = median(WAGP, na.rm = TRUE))
+
+```
+```{r}
+median_wage_by_race_chart <- ggplot(data = median_wage_by_race, aes(x = median_wage, y = reorder(RAC3P, -median_wage))) +
+  geom_bar(stat = "identity", width = 0.9, fill = "#3499db") +
+  labs(x = "", y = "") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1)) +
+  geom_text(aes(label = scales::dollar(median_wage, scale = 1)), hjust = -0.2, size = 3) +
+  theme_minimal()
+print(median_wage_by_race_chart)
+```
+
+
+
+
