@@ -50,3 +50,51 @@ bar_chart2 <- plot_ly(hi_earnings_ind, x = ~variable, y = ~estimate, type = "bar
 bar_chart
 ```
 
+
+
+
+
+
+```{r}
+hi_earnings_ind <- get_acs(
+  geometry = TRUE,
+  geography = "tract",
+  state = "Hawaii",
+  county = "Honolulu",
+  variables = c("All Industries" = "B24031_001",
+                "Accomodations and Food" = "B24031_025",
+                "Health and Human Services" = "B24031_022",
+                "Education" = "B24031_021"
+                ),
+  year = 2021
+)
+```
+
+
+```{r}
+hi_earnings_ind <- hi_earnings_ind %>% 
+  filter(GEOID != "15003981200")
+```
+
+
+```{r}
+hi_earnings_ind_map <- ggplot(hi_earnings_ind, aes(fill = estimate)) + 
+  geom_sf(color = NA) + 
+  facet_wrap(~variable) +
+  scale_fill_viridis_c() + 
+  theme_void() + 
+  labs(fill = "Median Income by Industry ($)")
+hi_earnings_ind_map
+```
+
+```{r}
+library(tidycensus)
+
+wy_pums <- get_pums(
+  variables = c("SEX", "AGEP", "HHT"),
+  state = "WY",
+  survey = "acs1",
+  year = 2019
+)
+```
+
