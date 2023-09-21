@@ -1,0 +1,190 @@
+---
+title: "Child Poverty as an Outcome Variable"
+author: "Connor Flynn"
+date: "9/21/2023"
+output: html_document
+---
+
+Load in Packages
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidycensus)
+library(plotly)
+library(scales)
+library(reactable)
+library(tigris)
+library(patchwork)
+library(shiny)
+library(leaflet)
+library(tibble)  # For data manipulation
+library(tidyr) 
+library(sf)
+library(RColorBrewer)
+library(ranger)
+library(missRanger)
+
+options(scipen=99)
+```
+
+
+
+```{r}
+v16 <- load_variables(2021, "acs5/profile", cache = TRUE)
+```
+
+
+
+
+
+```{r}
+pct_families_income_under_poverty_level <- get_acs(
+  geography = "tract", 
+  variables = "DP03_0120P",
+  state = "HI", 
+  year = 2021,
+  geometry = TRUE
+)|>
+  dplyr::filter(GEOID != "15003981200")
+```
+
+```{r}
+ggplot(pct_families_income_under_poverty_level, aes(fill = estimate)) + 
+  geom_sf(color = NA) + 
+  scale_fill_viridis_c() + 
+  theme_void() + 
+  labs(fill = "Family Poverty %")
+
+```
+
+Over Time
+
+
+```{r}
+years <- 2015:2021
+names(years) <- years
+
+pct_families_income_under_poverty_level_time_series <- map_dfr(years, ~{
+  get_acs(
+    geography = "tract",
+    geometry = "true",
+    state = "HI",
+    variables = "DP03_0120P",
+    year = .x
+  )
+}, .id = "year")
+
+```
+
+```{r}
+pct_families_income_under_poverty_level_time_series <- pct_families_income_under_poverty_level_time_series %>% 
+  dplyr::filter(GEOID != "15003981200")
+```
+
+
+```{r}
+ggplot(pct_families_income_under_poverty_level_time_series, aes(fill = estimate)) + 
+  geom_sf(color = NA) + 
+  scale_fill_viridis_c() + 
+  theme_void() + 
+  labs(fill = "Family Poverty %") +
+  facet_wrap(~year)
+```
+
+
+```{r}
+ggplot(pct_families_income_under_poverty_level_time_series, aes(x = estimate)) +
+  geom_histogram() +
+  theme_minimal() +
+  facet_grid(~year)
+```
+```{r}
+pct_families_income_under_poverty_level_time_series <- pct_families_income_under_poverty_level_time_series %>%
+  mutate(county = sub(".*?,\\s*(.*County, .*Hawaii)$", "\\1", NAME))
+```
+
+```{r}
+ggplot(pct_families_income_under_poverty_level_time_series, aes(x = estimate, fill = county)) +
+  geom_histogram(color = "black", bins = 50) +
+  theme_minimal() +
+  facet_grid(~year) +
+  scale_fill_brewer(palette = "Set3")
+```
+
+
+Model
+
+Variable Selection
+
+Poverty
+DP03_0120P = Percent!!PERCENTAGE OF FAMILIES AND PEOPLE WHOSE INCOME IN THE PAST 12 MONTHS IS BELOW THE POVERTY LEVEL!!All families!!With related children of the householder under 18 years
+
+Education 
+DP02PR_0067P = Percent!!EDUCATIONAL ATTAINMENT!!Population 25 years and over!!High school graduate or higher
+
+
+
+
+
+
+```{r}
+
+v16_percentages <- v16 %>%
+  filter(grepl("^Percent", label))
+
+
+all_variables <- as.list(v16_percentages$name)
+
+
+
+# Use the list of loaded variables to fetch data for all census tracts in Hawaii
+profile_percentage_variables_HI_tracts <- get_acs(geography = "tract", 
+                         variables = all_variables,
+                         state = "HI", 
+                         year = 2021)
+```
+
+
+
+```{r}
+profile_percentage_variables_HI_tracts <- profile_percentage_variables_HI_tracts %>%
+  select(-moe) %>% 
+  pivot_wider(names_from = variable, 
+              values_from = estimate)
+```
+
+
+```{r}
+# Assuming your dataframe is named profile_percentage_variables_HI_tracts
+# Loop through columns and check for values exceeding 101 or NA values
+# Assuming your dataframe is named profile_percentage_variables_HI_tracts
+# Define the columns to be checked for values exceeding 101 or NA values
+columns_to_check <- setdiff(names(profile_percentage_variables_HI_tracts), "NAME")
+
+# Loop through columns (excluding "NAME") and check for values exceeding 101 or NA values
+columns_to_keep <- sapply(profile_percentage_variables_HI_tracts[columns_to_check], function(col) all(is.na(col) | col <= 101))
+
+# Combine "NAME" column with columns meeting the condition
+profile_percentage_variables_HI_tracts_true <- profile_percentage_variables_HI_tracts[, c("NAME", columns_to_check[columns_to_keep])]
+
+```
+
+
+```{r}
+threshold <- 0.7
+
+# Create the new dataframe by filtering columns
+profile_percentage_variables_HI_tracts_true_less_na <- profile_percentage_variables_HI_tracts_true %>%
+  select(NAME, where(~mean(!is.na(.)) >= threshold))
+```
+
+
+```{r}
+hi_profile_data_cleaned <- profile_percentage_variables_HI_tracts_true_less_na
+```
+
+```{r}
+hi_profile_data_cleaned_imputed <- missRanger(hi_profile_data_cleaned)
+```
+
