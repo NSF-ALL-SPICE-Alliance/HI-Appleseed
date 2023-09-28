@@ -1,5 +1,5 @@
 ---
-title: "Child Poverty as an Outcome Variable"
+title: "Family Poverty w/ Child Under 18 as an Outcome Variable | Clustering"
 author: "Connor Flynn"
 date: "9/21/2023"
 output: html_document
@@ -33,13 +33,24 @@ options(scipen=99)
 ```
 
 
+The American Community Survey (ACS) is conducted by the U.S. Census Bureau and collects detailed demographic, social, economic, and housing information from a sample of households in the United States. The "profile" dataset contains a wide range of demographic and socioeconomic variables, such as:
+
+- Population Characteristics: Variables related to age, gender, race, ethnicity, marital status, and more.
+
+- Housing Characteristics: Variables related to housing units, such as the number of rooms, tenure (renter-occupied or owner-occupied), and housing value.
+
+- Economic Characteristics: Variables related to income, employment status, occupation, industry, and educational attainment.
+
+- Social Characteristics: Variables related to disability status, veteran status, and more.
+
+- Geographic Information: Variables related to geographic location, including state, county, tract, and block group.
 
 ```{r}
 v16 <- load_variables(2021, "acs5/profile", cache = TRUE)
 ```
 
 
-
+This pulls data specifically for the variable DP03_0120P (Percent!!PERCENTAGE OF FAMILIES AND PEOPLE WHOSE INCOME IN THE PAST 12 MONTHS IS BELOW THE POVERTY LEVEL!!All families!!With related children of the householder under 18 years)
 
 
 ```{r}
@@ -53,6 +64,8 @@ pct_families_income_under_poverty_level <- get_acs(
   dplyr::filter(GEOID != "15003981200")
 ```
 
+Plot Family Poverty by Census Tract
+
 ```{r}
 ggplot(pct_families_income_under_poverty_level, aes(fill = estimate)) + 
   geom_sf(color = NA) + 
@@ -62,7 +75,7 @@ ggplot(pct_families_income_under_poverty_level, aes(fill = estimate)) +
 
 ```
 
-Over Time
+Pull data on family overty over time in Hawaii
 
 
 ```{r}
@@ -80,12 +93,16 @@ pct_families_income_under_poverty_level_time_series <- map_dfr(years, ~{
 }, .id = "year")
 
 ```
+Drop census tract that contains northwestern Hawaiian Islands
 
 ```{r}
 pct_families_income_under_poverty_level_time_series <- pct_families_income_under_poverty_level_time_series %>% 
   dplyr::filter(GEOID != "15003981200")
 ```
 
+
+
+Plot Family Poverty over time
 
 ```{r}
 ggplot(pct_families_income_under_poverty_level_time_series, aes(fill = estimate)) + 
@@ -95,7 +112,7 @@ ggplot(pct_families_income_under_poverty_level_time_series, aes(fill = estimate)
   labs(fill = "Family Poverty %") +
   facet_wrap(~year)
 ```
-
+Plot Distribution of Family Poverty over time
 
 ```{r}
 ggplot(pct_families_income_under_poverty_level_time_series, aes(x = estimate)) +
@@ -108,6 +125,9 @@ pct_families_income_under_poverty_level_time_series <- pct_families_income_under
   mutate(county = sub(".*?,\\s*(.*County, .*Hawaii)$", "\\1", NAME))
 ```
 
+
+Add county info as color 
+
 ```{r}
 ggplot(pct_families_income_under_poverty_level_time_series, aes(x = estimate, fill = county)) +
   geom_histogram(color = "black", bins = 50) +
@@ -117,18 +137,10 @@ ggplot(pct_families_income_under_poverty_level_time_series, aes(x = estimate, fi
 ```
 
 
-Model
-
-Variable Selection
-
-Poverty
-DP03_0120P = Percent!!PERCENTAGE OF FAMILIES AND PEOPLE WHOSE INCOME IN THE PAST 12 MONTHS IS BELOW THE POVERTY LEVEL!!All families!!With related children of the householder under 18 years
+Random Forest
 
 
-
-
-
-
+Pull every variable from the ACS5 Profile Dataset for Hawaii by Census Tract (677)
 
 ```{r}
 
@@ -148,6 +160,7 @@ profile_percentage_variables_HI_tracts <- get_acs(geography = "tract",
 ```
 
 
+Drop Margin of Error Column and pivot wider so each variable becomes a column of the dataframe
 
 ```{r}
 profile_percentage_variables_HI_tracts <- profile_percentage_variables_HI_tracts %>%
@@ -157,10 +170,10 @@ profile_percentage_variables_HI_tracts <- profile_percentage_variables_HI_tracts
 ```
 
 
+Drop Columns with numeric values exceeding 100 (need to think through)
+
 ```{r}
-# Assuming your dataframe is named profile_percentage_variables_HI_tracts
-# Loop through columns and check for values exceeding 101 or NA values
-# Assuming your dataframe is named profile_percentage_variables_HI_tracts
+
 # Define the columns to be checked for values exceeding 101 or NA values
 columns_to_check <- setdiff(names(profile_percentage_variables_HI_tracts), "NAME")
 
@@ -172,6 +185,7 @@ profile_percentage_variables_HI_tracts_true <- profile_percentage_variables_HI_t
 
 ```
 
+Drop columns missing 30% or more of the data
 
 ```{r}
 threshold <- 0.7
@@ -181,18 +195,22 @@ profile_percentage_variables_HI_tracts_true_less_na <- profile_percentage_variab
   select(NAME, where(~mean(!is.na(.)) >= threshold))
 ```
 
+Save dataframe as hi_profile_data_cleaned
 
 ```{r}
 hi_profile_data_cleaned <- profile_percentage_variables_HI_tracts_true_less_na
 ```
 
+Impute missing data with MissRanger (takes some time)
+
 ```{r}
-hi_profile_data_cleaned_imputed <- missRanger(hi_profile_data_cleaned)
+#hi_profile_data_cleaned_imputed <- missRanger(hi_profile_data_cleaned)
 ```
 
+Save as csv in data folder
 
 ```{r}
-write_csv(hi_profile_data_cleaned_imputed, here("data/hi_profile_data_cleaned_imputed.csv"))
+# write_csv(hi_profile_data_cleaned_imputed, here("data/hi_profile_data_cleaned_imputed.csv"))
 ```
 
 
@@ -219,7 +237,7 @@ ImpData$Var.Names <- row.names(ImpData)
 
 
 
-Clustering!!
+Clustering!! (computing clustert output similiarity, homogeneity and completeness)
 
 
 
@@ -239,7 +257,7 @@ fviz_nbclust(hi_profile_data_cleaned_imputed_rownames, kmeans, method = "silhoue
 ```
 
 
-Cluster the newly imputed data
+Cluster the newly imputed data (try density based)
 
 
 
