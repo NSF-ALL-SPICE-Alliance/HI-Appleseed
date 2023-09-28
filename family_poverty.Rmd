@@ -24,6 +24,10 @@ library(sf)
 library(RColorBrewer)
 library(ranger)
 library(missRanger)
+library(randomForest)
+library(here)
+library(cluster)
+library(factoextra)
 
 options(scipen=99)
 ```
@@ -120,8 +124,6 @@ Variable Selection
 Poverty
 DP03_0120P = Percent!!PERCENTAGE OF FAMILIES AND PEOPLE WHOSE INCOME IN THE PAST 12 MONTHS IS BELOW THE POVERTY LEVEL!!All families!!With related children of the householder under 18 years
 
-Education 
-DP02PR_0067P = Percent!!EDUCATIONAL ATTAINMENT!!Population 25 years and over!!High school graduate or higher
 
 
 
@@ -186,5 +188,108 @@ hi_profile_data_cleaned <- profile_percentage_variables_HI_tracts_true_less_na
 
 ```{r}
 hi_profile_data_cleaned_imputed <- missRanger(hi_profile_data_cleaned)
+```
+
+
+```{r}
+write_csv(hi_profile_data_cleaned_imputed, here("data/hi_profile_data_cleaned_imputed.csv"))
+```
+
+
+
+Random Forest 
+
+```{r}
+rf_DP03_0120P <- randomForest(DP03_0120P ~ ., data = hi_profile_data_cleaned_imputed, 
+                   importance = TRUE)
+```
+
+```{r}
+rf_DP03_0120P
+```
+
+
+```{r}
+ImpData <- as.data.frame(importance(rf_DP03_0120P))
+ImpData$Var.Names <- row.names(ImpData)
+```
+
+
+*Need to Drop Some Variables*
+
+
+
+Clustering!!
+
+
+
+
+```{r}
+hi_profile_data_cleaned_imputed_rownames <- hi_profile_data_cleaned_imputed %>% remove_rownames %>% 
+  column_to_rownames(var="NAME")
+```
+
+```{r}
+hi_profile_data_cleaned_imputed_rownames <- as.data.frame(scale(hi_profile_data_cleaned_imputed_rownames))
+```
+
+
+```{r}
+fviz_nbclust(hi_profile_data_cleaned_imputed_rownames, kmeans, method = "silhouette")
+```
+
+
+Cluster the newly imputed data
+
+
+
+```{r}
+set.seed(3)
+kmeans2 <- kmeans(hi_profile_data_cleaned_imputed_rownames, center = 3, nstart = 100)
+```
+
+
+```{r}
+cluster_data <- as.data.frame(kmeans2$cluster)
+
+cluster_data <- cluster_data %>%
+  tibble::rownames_to_column(var = "NAME")
+
+cluster_data <- cluster_data %>%
+  rename(cluster = "kmeans2$cluster")
+```
+
+Map Clusters
+
+```{r}
+geometries <- get_acs(geography = "tract", 
+                         variables = "DP03_0120P",
+                         state = "HI", 
+                         year = 2021,
+                         geometry = TRUE)
+```
+```{r}
+cluster_geo_data <- full_join(cluster_data, geometries, by = "NAME")
+
+cluster_geo_data <- cluster_geo_data %>% 
+  filter(GEOID != "15003981200")
+```
+
+```{r}
+cluster_geo_sf <- st_as_sf(cluster_geo_data)
+
+```
+
+
+```{r}
+ggplot(cluster_geo_sf, aes(fill = cluster)) + 
+  geom_sf(color = NA) + 
+  scale_fill_viridis_c() + 
+  theme_void() + 
+  labs(fill = "Cluster")
+```
+
+```{r}
+table(cluster_geo_data$cluster)
 ```
 
