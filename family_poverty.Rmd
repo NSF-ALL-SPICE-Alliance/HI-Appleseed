@@ -45,8 +45,10 @@ The American Community Survey (ACS) is conducted by the U.S. Census Bureau and c
 
 - Geographic Information: Variables related to geographic location, including state, county, tract, and block group.
 
+
+Change to ACS 
 ```{r}
-v16 <- load_variables(2021, "acs5/profile", cache = TRUE)
+v16 <- load_variables(2021, "acs1/profile", cache = TRUE)
 ```
 
 
@@ -213,25 +215,112 @@ Save as csv in data folder
 # write_csv(hi_profile_data_cleaned_imputed, here("data/hi_profile_data_cleaned_imputed.csv"))
 ```
 
+```{r}
+hi_profile_data_cleaned_imputed <- read_csv(here("data/hi_profile_data_cleaned_imputed.csv"))
+```
+```{r}
+ggplot(hi_profile_data_cleaned_imputed, aes(x = DP03_0120P)) +
+  geom_histogram()
+```
+Drop poverty and Income Columns because they are too "obvious" of a predictor for poverty
+
+```{r}
+name_values <- c(
+    "DP03_0121P",
+    "DP03_0122P",
+    "DP03_0123P",
+    "DP03_0124P",
+    "DP03_0125P",
+    "DP03_0126P",
+    "DP03_0127P",
+    "DP03_0128P",
+    "DP03_0129P",
+    "DP03_0130P",
+    "DP03_0131P",
+    "DP03_0132P",
+    "DP03_0133P",
+    "DP03_0134P",
+    "DP03_0135P",
+    "DP03_0136P",
+    "DP03_0137P",
+    "DP03_0119P",
+    "DP03_0094P",
+    "DP03_0093P",
+    "DP03_0092P",
+    "DP03_0091P",
+    "DP03_0090P",
+    "DP03_0089P",
+    "DP03_0088P",
+    "DP03_0087P",
+    "DP03_0086P",
+    "DP03_0085P",
+    "DP03_0084P",
+    "DP03_0083P",
+    "DP03_0082P",
+    "DP03_0081P",
+    "DP03_0080P",
+    "DP03_0079P",
+    "DP03_0078P",
+    "DP03_0077P",
+    "DP03_0076P",
+    "DP03_0075P",
+    "DP03_0074P",
+    "DP03_0073P",
+    "DP03_0072P",
+    "DP03_0071P",
+    "DP03_0070P",
+    "DP03_0069P",
+    "DP03_0068P",
+    "DP03_0067P",
+    "DP03_0066P",
+    "DP03_0065P",
+    "DP03_0064P",
+    "DP03_0063P",
+    "DP03_0062P",
+    "DP03_0061P",
+    "DP03_0060P",
+    "DP03_0059P",
+    "DP03_0058P",
+    "DP03_0057P",
+    "DP03_0056P",
+    "DP03_0055P",
+    "DP03_0054P",
+    "DP03_0053P",
+    "DP03_0052P",
+    "DP03_0051P"
+)
+
+hi_profile_data_cleaned_imputed_dropped_features <- hi_profile_data_cleaned_imputed %>%
+  select(-one_of(name_values))
+
+```
 
 
 Random Forest 
 
 ```{r}
-rf_DP03_0120P <- randomForest(DP03_0120P ~ ., data = hi_profile_data_cleaned_imputed, 
+rf_DP03_0120P <- randomForest(DP03_0120P ~ ., data = hi_profile_data_cleaned_imputed_dropped_features, 
                    importance = TRUE)
 ```
 
 ```{r}
 rf_DP03_0120P
 ```
-
+View columns that are the most important in predicting the outcome
 
 ```{r}
 ImpData <- as.data.frame(importance(rf_DP03_0120P))
 ImpData$Var.Names <- row.names(ImpData)
 ```
 
+
+View descriptions by joining ImpData with v16 percentages
+
+```{r}
+ImpData$name <- rownames(ImpData)
+
+ImpData_Vars <- left_join(ImpData, v16_percentages, by = "name")
+```
 
 *Need to Drop Some Variables*
 
@@ -247,10 +336,15 @@ hi_profile_data_cleaned_imputed_rownames <- hi_profile_data_cleaned_imputed %>% 
   column_to_rownames(var="NAME")
 ```
 
+
+*Look further into scale()*
+
+
 ```{r}
 hi_profile_data_cleaned_imputed_rownames <- as.data.frame(scale(hi_profile_data_cleaned_imputed_rownames))
 ```
 
+Determine number of clusters we put into the algorithm
 
 ```{r}
 fviz_nbclust(hi_profile_data_cleaned_imputed_rownames, kmeans, method = "silhouette")
@@ -309,5 +403,50 @@ ggplot(cluster_geo_sf, aes(fill = cluster)) +
 
 ```{r}
 table(cluster_geo_data$cluster)
+```
+
+
+Clustering feature importance
+
+```{r}
+# Access cluster centroids
+centroids <- kmeans2$centers
+
+# Create an empty data frame to store cluster means
+cluster_means_df <- data.frame(Cluster = 1:3)  # Initialize with Cluster column
+
+# For each feature, calculate the mean value within each cluster
+for (col in 1:ncol(centroids)) {
+  feature_name <- colnames(centroids)[col]
+  cluster_means <- tapply(hi_profile_data_cleaned_imputed_rownames[[feature_name]], kmeans2$cluster, mean)
+  # Add cluster means as a column to the data frame
+  cluster_means_df[feature_name] <- cluster_means
+}
+
+# Now, cluster_means_df contains the mean values for each feature within each cluster
+
+
+```
+
+
+```{r}
+cluster_means_df_longer <- cluster_means_df %>% 
+  pivot_longer(!Cluster,
+               names_to = "name",
+               values_to = "value") 
+  
+
+# Pivot the data to have separate columns for each cluster
+pivoted_data <- cluster_means_df_longer %>%
+  pivot_wider(names_from = Cluster, values_from = value)
+
+# Calculate the differences between all clusters for each feature
+feature_differences <- pivoted_data %>%
+  mutate(Difference_1_2 = `1` - `2`,
+         Difference_1_3 = `1` - `3`,
+         Difference_2_3 = `2` - `3`)
+
+
+ImpCluster_Vars <- left_join(feature_differences, v16_percentages, by = "name")
 ```
 
